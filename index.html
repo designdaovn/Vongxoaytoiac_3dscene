@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crime Scene — First Person</title>
+<!-- Favicon — đặt file ảnh cùng thư mục với index.html trên GitHub -->
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="favicon.png">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { overflow:hidden; background:#111; font-family:'Segoe UI',sans-serif; cursor:crosshair; }
+canvas { display:block; }
+
+/* ── Loading ── */
+#loading {
+  position:fixed; inset:0; background:#0d0d12;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  z-index:200; transition:opacity 1s; padding:20px;
+}
+#loading h1 { color:#cc3333; font-size:clamp(1.2rem,5vw,2rem); letter-spacing:0.2em; text-transform:uppercase; margin-bottom:6px; text-shadow:0 0 30px rgba(200,50,50,0.5); text-align:center; }
+#loading p  { color:#555; font-size:clamp(0.7rem,2.5vw,0.8rem); letter-spacing:0.1em; margin-bottom:30px; text-align:center; }
+#bar { width:min(260px,80vw); height:3px; background:#1a1a2a; border-radius:2px; overflow:hidden; }
+#bar-fill { height:100%; width:0%; background:linear-gradient(90deg,#cc3333,#ff6666); transition:width 0.2s; }
+#bar-txt { color:#555; margin-top:10px; font-size:0.72rem; text-align:center; }
+
+/* ── Crosshair ── */
+#xhair {
+  position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+  width:16px; height:16px; pointer-events:none; z-index:50;
+}
+#xhair::before,#xhair::after { content:''; position:absolute; background:rgba(255,80,80,0.95); border-radius:1px; }
+#xhair::before { width:2px; height:100%; left:50%; transform:translateX(-50%); }
+#xhair::after  { width:100%; height:2px; top:50%; transform:translateY(-50%); }
+
+/* ── Badge (top-left) ── */
+#badge {
+  position:fixed; top:12px; left:12px; z-index:50; pointer-events:none;
+  background:rgba(0,0,0,0.75); border:1px solid rgba(180,30,30,0.4);
+  border-radius:10px; padding:6px 10px; backdrop-filter:blur(10px);
+}
+#badge b { color:#cc3333; font-size:clamp(9px,2.5vw,12px); letter-spacing:0.1em; text-transform:uppercase; display:block; }
+#badge small { color:#555; font-size:clamp(8px,2vw,10px); }
+
+/* ── Hint (top-center) — ẩn trên mobile nhỏ ── */
+#hint {
+  position:fixed; top:12px; left:50%; transform:translateX(-50%); z-index:50;
+  background:rgba(0,0,0,0.75); color:rgba(255,200,200,0.9);
+  padding:6px 14px; border-radius:20px; font-size:clamp(9px,2.2vw,11px);
+  border:1px solid rgba(180,50,50,0.3); backdrop-filter:blur(8px);
+  pointer-events:none; transition:opacity 1.5s;
+  white-space:nowrap; max-width:calc(100vw - 160px); overflow:hidden; text-overflow:ellipsis;
+}
+
+/* ── D-pad — hình thập tự chuẩn ── */
+/* ── D-pad wrapper: flex row gồm cross + jump ── */
+#dpad-wrap {
+  position:fixed; bottom:16px; left:12px;
+  display:flex; flex-direction:row; align-items:center;
+  gap:8px; z-index:100;
+  user-select:none; -webkit-user-select:none;
+  -webkit-touch-callout:none;
+}
+/* Cross grid 3x3 */
+#dpad {
+  display:grid;
+  grid-template-columns:repeat(3, var(--bs));
+  grid-template-rows:repeat(3, var(--bs));
+  gap:3px;
+  --bs: min(11vw, 52px);
+}
+.btn, #btn-jump {
+  width:var(--bs,44px); height:var(--bs,44px);
+  /* Reset hoàn toàn iOS default styles */
+  -webkit-appearance:none; appearance:none;
+  background:rgba(0,0,0,0.55); border:1px solid rgba(200,60,60,0.4);
+  border-radius:10px;
+  /* Không dùng color/font-size cho text — dùng SVG thay thế */
+  color:transparent; font-size:0;
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
+  user-select:none; -webkit-user-select:none;
+  -webkit-tap-highlight-color:rgba(0,0,0,0);
+  -webkit-touch-callout:none;
+  backdrop-filter:blur(6px); transition:background 0.1s,transform 0.08s;
+  touch-action:none; flex-shrink:0; box-sizing:border-box;
+}
+.btn:active,.btn.on,#btn-jump:active,#btn-jump.on {
+  background:rgba(200,50,50,0.5); transform:scale(0.93);
+}
+.btn.empty { visibility:hidden; pointer-events:none; }
+/* SVG icon bên trong nút */
+.btn svg, #btn-jump svg {
+  width:38%; height:38%; pointer-events:none; flex-shrink:0;
+}
+.btn-center svg { width:28%; height:28%; }
+/* Jump màu xanh */
+#btn-jump { border-color:rgba(80,140,255,0.5); }
+#btn-jump:active,#btn-jump.on { background:rgba(50,80,200,0.5); }
+/* btn-center */
+.btn-center {
+  background:rgba(255,255,255,0.05);
+  border-color:rgba(200,60,60,0.2);
+  pointer-events:auto; cursor:pointer;
+}
+.btn-center:active,.btn-center.on {
+  background:rgba(200,50,50,0.45) !important; transform:scale(0.93);
+}
+/* Nút fullscreen */
+/* ══ Right buttons — fs / vr / rotate ══ */
+#right-btns {
+  position:fixed; right:12px; bottom:20px;
+  position:fixed; right:12px; bottom:20px;
+  display:flex; flex-direction:column;
+  align-items:center; gap:8px; z-index:101;
+}
+/* Tất cả 3 nút: cùng kích thước, thẳng hàng, căn phải */
+#fs-btn, #vr-btn, #rotate-btn {
+  --rbtn: clamp(44px, 11vw, 50px);
+  width:var(--rbtn); height:var(--rbtn);
+  border-radius:12px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  backdrop-filter:blur(8px);
+  transition:background 0.15s, transform 0.1s;
+  -webkit-tap-highlight-color:transparent;
+  -webkit-appearance:none; appearance:none;
+  box-sizing:border-box; flex-shrink:0;
+}
+#fs-btn     { background:rgba(0,0,0,0.7); border:1px solid rgba(255,200,80,0.5); }
+#vr-btn     { background:rgba(0,0,0,0.7); border:1px solid rgba(100,160,255,0.5); }
+#rotate-btn { background:rgba(0,0,0,0.7); border:1px solid rgba(200,60,60,0.5); color:#cc6666; }
+#fs-btn:active     { background:rgba(180,130,0,0.45);  transform:scale(0.92); }
+#vr-btn:active     { background:rgba(60,100,200,0.45); transform:scale(0.92); }
+#rotate-btn:active { background:rgba(160,30,30,0.45);  transform:scale(0.92); }
+#fs-btn svg, #vr-btn svg, #rotate-btn svg { width:52%; height:52%; display:block; flex-shrink:0; }
+#ctrl { display:none !important; }
+
+/* ── Nút tương tác E — ẨN hoàn toàn, thay bằng nút ⊙ ── */
+#btn-interact { display:none !important; }
+
+/* ── Inspect label ── */
+#inspect-label {
+  position:fixed; left:50%; transform:translateX(-50%);
+  background:rgba(0,0,0,0.75); color:#fff; padding:6px 16px;
+  border-radius:20px; font-size:clamp(10px,2.5vw,12px); letter-spacing:0.05em;
+  border:1px solid rgba(255,255,255,0.15); backdrop-filter:blur(8px);
+  pointer-events:none; z-index:50; display:none;
+  max-width:70vw; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+
+/* ── Interact prompt ── */
+#interact-prompt {
+  position:fixed; left:50%; transform:translateX(-50%);
+  background:rgba(200,50,50,0.85); color:#fff; padding:7px 20px;
+  border-radius:20px; font-size:clamp(10px,2.5vw,12px); font-weight:bold; letter-spacing:0.08em;
+  pointer-events:none; z-index:50; display:none; white-space:nowrap;
+}
+
+/* ── Popup tương tác ── */
+#interact-popup {
+  position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+  background:rgba(10,10,20,0.95); color:#eee;
+  padding:clamp(16px,4vw,24px) clamp(16px,5vw,28px);
+  border-radius:14px; font-size:clamp(12px,3vw,13px); line-height:1.7;
+  border:1px solid rgba(200,50,50,0.4); backdrop-filter:blur(12px);
+  pointer-events:auto; z-index:60; display:none;
+  width:min(340px, 88vw);
+  text-align:center; box-shadow:0 0 40px rgba(0,0,0,0.6);
+}
+#popup-title { color:#ff8888; font-size:clamp(13px,3.5vw,15px); font-weight:bold; margin-bottom:8px; }
+#popup-close-hint { margin-top:12px; color:#555; font-size:clamp(10px,2.5vw,11px); }
+
+/* #vr-btn style — managed by #right-btns container */
+
+/* ── QR Popup ── */
+#qr-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,0.6);
+  z-index:150; display:none; align-items:center; justify-content:center;
+  backdrop-filter:blur(4px);
+}
+#qr-overlay.open { display:flex; }
+#qr-card {
+  background:rgba(8,8,18,0.97); border:1px solid rgba(80,140,255,0.35);
+  border-radius:18px; padding:clamp(18px,5vw,28px) clamp(18px,5vw,28px);
+  text-align:center; width:min(300px,88vw);
+  box-shadow:0 0 50px rgba(0,0,80,0.5); position:relative;
+  animation: qrPop 0.22s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes qrPop { from { opacity:0; transform:scale(0.82); } to { opacity:1; transform:scale(1); } }
+#qr-card h3 {
+  color:#88aaff; font-size:clamp(12px,3vw,14px); letter-spacing:0.15em;
+  text-transform:uppercase; margin-bottom:14px;
+}
+#qr-img-wrap {
+  background:#fff; border-radius:10px; padding:10px;
+  display:inline-block; margin-bottom:16px;
+}
+#qr-img-wrap img {
+  display:block; width:clamp(140px,50vw,180px); height:auto;
+  border-radius:4px;
+}
+#qr-actions { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+.qr-action-btn {
+  flex:1; min-width:90px; max-width:130px;
+  padding:9px 14px; border-radius:10px; font-size:clamp(11px,2.8vw,13px);
+  font-weight:bold; cursor:pointer; border:none; letter-spacing:0.05em;
+  transition:opacity 0.15s, transform 0.1s; -webkit-tap-highlight-color:transparent;
+}
+.qr-action-btn:active { transform:scale(0.93); opacity:0.8; }
+#qr-copy-btn { background:rgba(60,80,180,0.25); border:1px solid rgba(80,140,255,0.4); color:#88aaff; }
+#qr-open-btn { background:rgba(80,140,255,0.2); border:1px solid rgba(80,140,255,0.5); color:#cce0ff; }
+#qr-copy-btn:hover { background:rgba(60,80,180,0.4); }
+#qr-open-btn:hover { background:rgba(80,140,255,0.35); }
+#qr-close-btn {
+  position:absolute; top:10px; right:12px;
+  background:none; border:none; color:#445; font-size:18px;
+  cursor:pointer; line-height:1; padding:2px 5px; border-radius:6px;
+}
+#qr-close-btn:hover { color:#88aaff; }
+#qr-copied-msg {
+  font-size:11px; color:#66cc88; margin-top:8px; height:14px;
+  transition:opacity 0.4s;
+}
+
+/* ── Corner decorations ── */
+.corner { position:fixed; width:16px; height:16px; border-color:rgba(200,30,30,0.45); border-style:solid; pointer-events:none; z-index:45; }
+.corner.tl{top:8px;left:8px;border-width:2px 0 0 2px}
+.corner.tr{top:8px;right:8px;border-width:2px 2px 0 0}
+.corner.bl{bottom:8px;left:8px;border-width:0 0 2px 2px}
+.corner.br{bottom:8px;right:8px;border-width:0 2px 2px 0}
+
+/* ════════════════════════════════════════
+   RESPONSIVE — Mobile (≤ 480px)
+════════════════════════════════════════ */
+@media (max-width:480px) {
+  /* Ẩn hint trên màn hình nhỏ */
+  #hint { display:none !important; }
+  /* Hiện nút E */
+  /* Popup chiếm rộng hơn */
+  #interact-popup { width:92vw; }
+}
+
+/* ════════════════════════════════════════
+   RESPONSIVE — Tablet nhỏ (481–767px)
+════════════════════════════════════════ */
+@media (min-width:481px) and (max-width:767px) {
+  #hint { font-size:10px; max-width:calc(100vw - 200px); }
+}
+
+/* ════════════════════════════════════════
+   Desktop / màn hình lớn
+════════════════════════════════════════ */
+@media (min-width:768px) {
+  #dpad { --bs: 50px; }
+  .cbtn { font-size:11px; }
+}
+</style>
+</head>
+<body>
+<div id="loading">
+  <h1>☠ Crime Scene</h1>
+  <p>First Person Explorer</p>
+  <div id="bar"><div id="bar-fill"></div></div>
+  <div id="bar-txt">Đang tải...</div>
+</div>
+<div id="xhair"></div>
+<div class="corner tl"></div><div class="corner tr"></div>
+<div class="corner bl"></div><div class="corner br"></div>
+<div id="badge"><b>☠ Crime Scene</b><small>First Person · 3D</small></div>
+<div id="hint">Giữ chuột trái + kéo để nhìn · WASD di chuyển · Space nhảy</div>
+<div id="inspect-label">
+  <span id="inspect-name" style="color:#ffdd88"></span>
+</div>
+<div id="interact-prompt">
+  Nhấn <kbd style='background:rgba(255,255,255,0.2);padding:1px 6px;border-radius:4px'>E</kbd> để tương tác
+</div>
+<div id="interact-popup">
+  <div id="popup-title"></div>
+  <div id="popup-body"></div>
+  <div id="popup-close-hint">Nhấn E hoặc Esc để đóng</div>
+</div>
+<div id="dpad-wrap">
+  <div id="dpad">
+    <div class="btn empty"></div>
+    <div class="btn" id="btn-w"><svg viewBox="0 0 24 24"><path d="M12 6l-8 10h16z" fill="rgba(255,150,150,0.9)"/></svg></div>
+    <div class="btn empty"></div>
+    <div class="btn" id="btn-a"><svg viewBox="0 0 24 24"><path d="M6 12l10-8v16z" fill="rgba(255,150,150,0.9)"/></svg></div>
+    <div class="btn btn-center" id="btn-center"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="rgba(255,150,150,0.4)"/><circle cx="12" cy="12" r="8" fill="none" stroke="rgba(255,150,150,0.3)" stroke-width="1.5"/></svg></div>
+    <div class="btn" id="btn-d"><svg viewBox="0 0 24 24"><path d="M18 12L8 4v16z" fill="rgba(255,150,150,0.9)"/></svg></div>
+    <div class="btn empty"></div>
+    <div class="btn" id="btn-s"><svg viewBox="0 0 24 24"><path d="M12 18l8-10H4z" fill="rgba(255,150,150,0.9)"/></svg></div>
+    <div class="btn empty"></div>
+  </div>
+  <div id="btn-jump"><svg viewBox="0 0 24 24"><path d="M12 5l-8 10h16z" fill="rgba(140,180,255,0.9)"/><rect x="10" y="15" width="4" height="5" rx="1" fill="rgba(140,180,255,0.9)"/></svg></div>
+</div>
+<div id="right-btns">
+  <div id="fs-btn" title="Toàn màn hình"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M3 3h6v2H5v4H3V3zm12 0h6v6h-2V5h-4V3zM3 15h2v4h4v2H3v-6zm16 4h-4v2h6v-6h-2v4z" fill="#ffd060"/>
+  </svg></div>
+  <div id="vr-btn" title="Xem trong VR / AR"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 9C2 7.9 2.9 7 4 7H20C21.1 7 22 7.9 22 9V15C22 16.1 21.1 17 20 17H16L14 15H10L8 17H4C2.9 17 2 16.1 2 15V9Z" stroke="#88aaff" stroke-width="1.6" fill="none"/>
+    <circle cx="8.5" cy="12" r="2" stroke="#88aaff" stroke-width="1.4" fill="rgba(80,140,255,0.15)"/>
+    <circle cx="15.5" cy="12" r="2" stroke="#88aaff" stroke-width="1.4" fill="rgba(80,140,255,0.15)"/>
+  </svg></div>
+  <div id="rotate-btn" title="Xoay màn hình"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" >
+  <rect x="3" y="7" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.8" fill="none"/>
+  <circle cx="17.5" cy="12" r="1" fill="currentColor"/>
+  <path d="M19 9.5c1 .7 1.7 1.5 1.7 2.5s-.7 1.8-1.7 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+  <path d="M20.5 7.5c1.8 1.1 3 2.7 3 4.5s-1.2 3.4-3 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+</svg></div>
+</div>
+
+<!-- QR Popup Overlay -->
+<div id="qr-overlay">
+  <div id="qr-card">
+    <button id="qr-close-btn">✕</button>
+    <h3>🥽 Trải nghiệm VR / AR</h3>
+    <div id="qr-img-wrap">
+      <!-- ══ THAY URL ẢNH QR TẠI ĐÂY ══ -->
+      <img id="qr-img" src="https://raw.githubusercontent.com/designdaovn/acgiaacbao-3dscene/refs/heads/main/IOS%20ar.png" alt="QR Code" />
+    </div>
+    <div id="qr-actions">
+      <button class="qr-action-btn" id="qr-copy-btn">📋 Copy link</button>
+      <button class="qr-action-btn" id="qr-open-btn">🔗 Open link</button>
+    </div>
+    <div id="qr-copied-msg"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js"></script>
+<script>
+// ── Renderer ─────────────────────────────────────────────────────
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping    = THREE.NoToneMapping;
+document.body.appendChild(renderer.domElement);
+
+// ── Scene ─────────────────────────────────────────────────────────
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87CEEB);
+
+// ── Camera — YXZ order: yaw quanh Y trước, pitch quanh X sau ──────
+// Đây là cách đúng nhất cho FPS, KHÔNG dùng pivot wrapper
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 500);
+camera.rotation.order = 'YXZ';
+scene.add(camera);
+
+// ── Look angles ──────────────────────────────────────────────────
+let yaw   = 0;  // xoay ngang (Y axis)
+let pitch = 0;  // ngước/cúi (X axis)
+
+function applyLook() {
+  camera.rotation.y = yaw;
+  camera.rotation.x = pitch;
+}
+
+// ── Load GLB ─────────────────────────────────────────────────────
+const barFill = document.getElementById('bar-fill');
+const barTxt  = document.getElementById('bar-txt');
+const loader  = new THREE.GLTFLoader();
+const draco   = new THREE.DRACOLoader();
+draco.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/draco/');
+loader.setDRACOLoader(draco);
+
+let FLOOR_Y = 0;
+
+loader.load('Crime_Scene.glb',
+  (gltf) => {
+    barFill.style.width = '80%';
+    barTxt.textContent  = 'Đang xử lý...';
+
+    const model = gltf.scene;
+
+    // Tắt đèn gốc GLB (Sun intensity=683 quá mạnh)
+    model.traverse((node) => {
+      if (node.isLight) { node.visible = false; return; }
+      if (!node.isMesh) return;
+      node.castShadow    = true;
+      node.receiveShadow = true;
+
+      const fix = (mat) => {
+        if (!mat) return mat;
+        const std = new THREE.MeshStandardMaterial({
+          map:         mat.map || null,
+          color:       mat.map ? 0xffffff : (mat.color || new THREE.Color(0.8,0.8,0.8)),
+          roughness:   0.95,
+          metalness:   0.0,
+          side:        THREE.DoubleSide,
+          transparent: mat.transparent || false,
+          alphaTest:   mat.alphaTest   || 0,
+        });
+        if (std.map) { std.map.encoding = THREE.sRGBEncoding; std.map.needsUpdate = true; }
+        return std;
+      };
+      if (Array.isArray(node.material)) node.material = node.material.map(fix);
+      else { const m = fix(node.material); if (m) node.material = m; }
+    });
+
+    // 3-point lighting system
+    const keyLight = new THREE.DirectionalLight(0xfff5e0, 1.2);
+    keyLight.position.set(5, 10, 5); keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048,2048); scene.add(keyLight);
+    const fillLight = new THREE.DirectionalLight(0xe0f0ff, 0.5);
+    fillLight.position.set(-5, 4, -5); scene.add(fillLight);
+    const rimLight = new THREE.DirectionalLight(0xffffff, 0.3);
+    rimLight.position.set(0, 3, -10); scene.add(rimLight);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+
+    scene.add(model);
+
+    const box    = new THREE.Box3().setFromObject(model);
+    const size   = new THREE.Vector3(); box.getSize(size);
+    const center = new THREE.Vector3(); box.getCenter(center);
+    FLOOR_Y      = box.min.y;
+    window._BOX  = box;
+
+    // Đặt camera ở giữa phòng, cao mắt người
+    camera.position.set(center.x, FLOOR_Y + 1.65, center.z);
+    applyLook();
+
+    barFill.style.width = '100%';
+    barTxt.textContent  = 'Hoàn tất! ✓';
+    setTimeout(() => {
+      const l = document.getElementById('loading');
+      l.style.opacity = '0';
+      setTimeout(() => l.style.display = 'none', 900);
+    }, 300);
+    setTimeout(() => document.getElementById('hint').style.opacity = '0', 8000);
+  },
+  (xhr) => {
+    if (xhr.lengthComputable) {
+      const p = Math.round(xhr.loaded / xhr.total * 78);
+      barFill.style.width = p + '%';
+      barTxt.textContent  = `Đang tải... ${p}%`;
+    }
+  },
+  (err) => {
+    barTxt.textContent = '❌ Không tìm thấy Crime_Scene.glb — đặt 2 file cùng thư mục';
+    barTxt.style.color = '#f55';
+    console.error(err);
+  }
+);
+
+// ── Physics ───────────────────────────────────────────────────────
+const GRAVITY  = -14;
+const JUMP_VEL = 5.5;
+const EYE_H    = 1.65;
+let velY       = 0;
+let onGround   = false;
+
+// ── Mouse look: giữ chuột trái kéo ───────────────────────────────
+let lmb = false, mx = 0, my = 0;
+
+document.addEventListener('mousedown', (e) => {
+  if (e.button !== 0) return;
+  if (e.target.closest('#dpad-wrap,#ctrl,#badge,#hint')) return;
+  lmb = true; mx = e.clientX; my = e.clientY;
+  document.body.style.cursor = 'grabbing';
+});
+document.addEventListener('mouseup', (e) => {
+  if (e.button !== 0) return;
+  lmb = false;
+  document.body.style.cursor = 'crosshair';
+});
+document.addEventListener('mousemove', (e) => {
+  if (lmb) {
+    yaw   -= (e.clientX - mx) * 0.003;
+    pitch -= (e.clientY - my) * 0.003;
+    pitch  = Math.max(-1.4, Math.min(1.4, pitch));
+    mx = e.clientX; my = e.clientY;
+  } else if (document.pointerLockElement) {
+    yaw   -= e.movementX * 0.002;
+    pitch -= e.movementY * 0.002;
+    pitch  = Math.max(-1.4, Math.min(1.4, pitch));
+  }
+});
+
+// Double-click → Pointer Lock
+renderer.domElement.addEventListener('dblclick', () => renderer.domElement.requestPointerLock());
+document.addEventListener('pointerlockchange', () => {
+  document.body.style.cursor = document.pointerLockElement ? 'none' : 'crosshair';
+});
+
+// ── Touch look ────────────────────────────────────────────────────
+let tid = null, tlx = 0, tly = 0;
+renderer.domElement.addEventListener('touchstart', (e) => {
+  if (e.target.closest('#dpad-wrap,#ctrl')) return;
+  if (tid !== null) return;
+  tid = e.changedTouches[0].identifier;
+  tlx = e.changedTouches[0].clientX;
+  tly = e.changedTouches[0].clientY;
+}, { passive: true });
+renderer.domElement.addEventListener('touchmove', (e) => {
+  for (const t of e.changedTouches) {
+    if (t.identifier !== tid) continue;
+    yaw   -= (t.clientX - tlx) * 0.004;
+    pitch -= (t.clientY - tly) * 0.004;
+    pitch  = Math.max(-1.4, Math.min(1.4, pitch));
+    tlx = t.clientX; tly = t.clientY;
+  }
+}, { passive: true });
+renderer.domElement.addEventListener('touchend', (e) => {
+  for (const t of e.changedTouches) if (t.identifier === tid) tid = null;
+}, { passive: true });
+
+// ── Keyboard ─────────────────────────────────────────────────────
+const K = {};
+document.addEventListener('keydown', (e) => {
+  K[e.code] = true;
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (onGround) { velY = JUMP_VEL; onGround = false; }
+  }
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault();
+});
+document.addEventListener('keyup', (e) => { K[e.code] = false; });
+
+// Nút xoay ngang màn hình (chỉ hoạt động trên mobile)
+document.getElementById('rotate-btn').addEventListener('click', () => {
+  if (screen.orientation && screen.orientation.lock) {
+    // API mới — hỗ trợ Android Chrome
+    screen.orientation.lock('landscape').catch(() => {
+      // Fallback: dùng webkit
+      tryLockLandscape();
+    });
+  } else {
+    tryLockLandscape();
+  }
+});
+
+function tryLockLandscape() {
+  // Fallback cho iOS và các trình duyệt cũ
+  if (window.screen.lockOrientation) {
+    window.screen.lockOrientation('landscape');
+  } else if (window.screen.mozLockOrientation) {
+    window.screen.mozLockOrientation('landscape');
+  } else if (window.screen.msLockOrientation) {
+    window.screen.msLockOrientation('landscape');
+  } else {
+    // Không hỗ trợ lock → hướng dẫn user xoay tay
+    alert('Vui lòng xoay điện thoại sang ngang và tắt khóa xoay màn hình!');
+  }
+}
+
+// Tự động ẩn/hiện nút xoay tùy theo orientation
+function updateRotateBtn() {
+  const btn = document.getElementById('rotate-btn');
+  if (!btn) return;
+  const isLandscape = window.innerWidth > window.innerHeight;
+  btn.innerHTML = isLandscape ? `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" >
+  <rect x="7" y="3" width="10" height="14" rx="2" stroke="currentColor" stroke-width="1.8" fill="none"/>
+  <circle cx="12" cy="17.5" r="1" fill="currentColor"/>
+  <path d="M14.5 19c-.7 1-1.5 1.7-2.5 1.7s-1.8-.7-2.5-1.7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+</svg>` : `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" >
+  <rect x="3" y="7" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.8" fill="none"/>
+  <circle cx="17.5" cy="12" r="1" fill="currentColor"/>
+  <path d="M19 9.5c1 .7 1.7 1.5 1.7 2.5s-.7 1.8-1.7 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+  <path d="M20.5 7.5c1.8 1.1 3 2.7 3 4.5s-1.2 3.4-3 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+</svg>`;
+}
+window.addEventListener('resize', updateRotateBtn);
+updateRotateBtn();
+
+// ── D-pad ─────────────────────────────────────────────────────────
+[['btn-w','KeyW'],['btn-s','KeyS'],['btn-a','KeyA'],['btn-d','KeyD']].forEach(([id,code]) => {
+  const el = document.getElementById(id);
+  const on  = () => { K[code]=true;  el.classList.add('on'); };
+  const off = () => { K[code]=false; el.classList.remove('on'); };
+  el.addEventListener('mousedown',   on);
+  el.addEventListener('touchstart',  on,  {passive:true});
+  el.addEventListener('mouseup',     off);
+  el.addEventListener('mouseleave',  off);
+  el.addEventListener('touchend',    off, {passive:true});
+  el.addEventListener('touchcancel', off, {passive:true});
+});
+
+const doJump = () => { if (onGround) { velY=JUMP_VEL; onGround=false; } };
+document.getElementById('btn-jump').addEventListener('mousedown',  doJump);
+document.getElementById('btn-jump').addEventListener('touchstart', doJump, {passive:true});
+document.getElementById('btn-jump').addEventListener('touchend',   ()=>{}, {passive:true});
+const SPEEDS = [4.0];
+let sMode = 0;
+
+// ── Raycaster ─────────────────────────────────────────────────────
+const raycaster    = new THREE.Raycaster();
+const screenCenter = new THREE.Vector2(0, 0);
+
+// ── Dữ liệu tương tác ─────────────────────────────────────────────
+const INTERACTIONS = {
+  'Plane.001':                { title: '🩸 Vết máu',            body: 'Có vết máu trên mặt đất. Nhóm máu AB+. Cần phân tích thêm.' },
+  'Bulletin':                 { title: '📋 Bảng thông tin',     body: 'Bảng ghi chú của nạn nhân. Có địa chỉ và số điện thoại lạ.' },
+  'model_0':                  { title: '📋 Bảng thông tin',     body: 'Bảng ghi chú của nạn nhân. Có địa chỉ và số điện thoại lạ.' },
+  'door_Door_material_0':     { title: '🚪 Cánh cửa',           body: 'Cửa bị khóa từ bên trong. Không có dấu hiệu bị phá.' },
+  'Triple Monitor_Palette_0': { title: '🖥️ Màn hình máy tính', body: 'Màn hình vẫn còn bật. Có tài liệu mật đang mở.' },
+  'Folder_Palette_0':         { title: '📁 Hồ sơ',              body: 'Hồ sơ bí mật. Tên: OPERATION X. Ngày: 15/03/2024.' },
+  'Paper_Palette_0':          { title: '📄 Tờ giấy',            body: 'Một tờ giấy viết tay: "Họ biết tôi ở đây. Đừng tin ai."' },
+};
+
+let currentHit = null;
+let popupOpen  = false;
+
+function closePopup() {
+  document.getElementById('interact-popup').style.display = 'none';
+  popupOpen = false;
+}
+function openPopup(name) {
+  const data = INTERACTIONS[name];
+  if (!data) return;
+  document.getElementById('popup-title').textContent = data.title;
+  document.getElementById('popup-body').textContent  = data.body;
+  document.getElementById('interact-popup').style.display = 'block';
+  popupOpen = true;
+}
+
+// ── Vị trí label tránh bị d-pad che ──────────────────────────────
+function updateLabelPositions() {
+  const dpadH = document.getElementById('dpad-wrap').offsetHeight;
+  document.getElementById('inspect-label').style.bottom   = (16 + dpadH + 10) + 'px';
+  document.getElementById('interact-prompt').style.bottom = (16 + dpadH + 48) + 'px';
+  // right-btns tự căn qua CSS, không cần set bottom động nữa
+}
+updateLabelPositions();
+window.addEventListener('resize', updateLabelPositions);
+
+// ── Nút ⊙ giữa = tương tác ───────────────────────────────────────
+const centerBtn = document.getElementById('btn-center');
+const doInteract = () => {
+  if (popupOpen) { closePopup(); return; }
+  if (currentHit && INTERACTIONS[currentHit]) openPopup(currentHit);
+};
+centerBtn.addEventListener('click',      doInteract);
+centerBtn.addEventListener('touchstart', doInteract, { passive: true });
+
+// Tap popup để đóng
+document.getElementById('interact-popup').addEventListener('click', closePopup);
+document.getElementById('interact-popup').addEventListener('touchstart', (e) => {
+  e.stopPropagation(); closePopup();
+}, { passive: true });
+
+// Phím E / Esc
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'KeyE') {
+    if (popupOpen) { closePopup(); return; }
+    if (currentHit && INTERACTIONS[currentHit]) openPopup(currentHit);
+  }
+  if (e.code === 'Escape') closePopup();
+});
+
+// Context menu trên d-pad
+document.getElementById('dpad-wrap').addEventListener('contextmenu', e => e.preventDefault());
+
+// ── Game Loop ─────────────────────────────────────────────────────
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+
+  camera.rotation.y = yaw;
+  camera.rotation.x = pitch;
+
+  // Movement
+  const dir = new THREE.Vector3();
+  camera.getWorldDirection(dir);
+  dir.y = 0;
+  dir.normalize();
+
+  const rightX =  dir.z;
+  const rightZ = -dir.x;
+
+  const mf = ((K['KeyW']||K['ArrowUp'])    ? 1:0) - ((K['KeyS']||K['ArrowDown'])  ? 1:0);
+  const mr = ((K['KeyA']||K['ArrowLeft'])  ? 1:0) - ((K['KeyD']||K['ArrowRight']) ? 1:0);
+
+  if (mf !== 0 || mr !== 0) {
+    const dx  = dir.x * mf + rightX * mr;
+    const dz  = dir.z * mf + rightZ * mr;
+    const len = Math.sqrt(dx*dx + dz*dz);
+    const sp  = SPEEDS[sMode] * dt;
+    camera.position.x += (dx/len) * sp;
+    camera.position.z += (dz/len) * sp;
+  }
+
+  // Gravity & jump
+  if (!onGround) velY += GRAVITY * dt;
+  camera.position.y += velY * dt;
+  const ground = FLOOR_Y + EYE_H;
+  if (camera.position.y <= ground) {
+    camera.position.y = ground;
+    velY = 0;
+    onGround = true;
+  }
+
+  // Boundary
+  if (window._BOX) {
+    const b = window._BOX, m = 0.2;
+    camera.position.x = Math.max(b.min.x+m, Math.min(b.max.x-m, camera.position.x));
+    camera.position.z = Math.max(b.min.z+m, Math.min(b.max.z-m, camera.position.z));
+  }
+
+  // Raycast
+  if (!popupOpen) {
+    raycaster.setFromCamera(screenCenter, camera);
+    const hits = raycaster.intersectObjects(scene.children, true);
+    const inspectEl = document.getElementById('inspect-label');
+    const promptEl  = document.getElementById('interact-prompt');
+    const nameEl    = document.getElementById('inspect-name');
+    if (hits.length > 0 && hits[0].distance < 4.0) {
+      const name = hits[0].object.name || hits[0].object.parent?.name || '';
+      currentHit = name;
+      nameEl.textContent      = name;
+      inspectEl.style.display = 'block';
+      promptEl.style.display  = INTERACTIONS[name] ? 'block' : 'none';
+    } else {
+      currentHit = null;
+      inspectEl.style.display = 'none';
+      promptEl.style.display  = 'none';
+    }
+  }
+
+  renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ── Fullscreen ────────────────────────────────────────────────────
+const fsBtn = document.getElementById('fs-btn');
+
+function toggleFullscreen() {
+  const isFull = !!(document.fullscreenElement || document.webkitFullscreenElement);
+  if (!isFull) {
+    const el = document.documentElement;
+    const req = el.requestFullscreen || el.webkitRequestFullscreen
+              || el.mozRequestFullScreen || el.msRequestFullscreen;
+    if (req) {
+      req.call(el).then(() => {
+        if (screen.orientation && screen.orientation.lock)
+          screen.orientation.lock('landscape').catch(()=>{});
+      }).catch(()=>{});
+    } else {
+      // iOS Safari không có Fullscreen API → ẩn browser UI bằng scroll trick
+      window.scrollTo(0, 1);
+      // Hướng dẫn thêm Home Screen
+      alert('Trên iOS: nhấn Share → "Thêm vào màn hình chính" để chơi fullscreen!');
+    }
+  } else {
+    const exit = document.exitFullscreen || document.webkitExitFullscreen
+               || document.mozCancelFullScreen || document.msExitFullscreen;
+    if (exit) exit.call(document);
+  }
+}
+fsBtn.addEventListener('click',      toggleFullscreen);
+fsBtn.addEventListener('touchstart', (e) => { e.stopPropagation(); toggleFullscreen(); }, { passive:true });
+
+// Cập nhật icon khi fullscreen thay đổi
+function onFsChange() {
+  const isFull = !!(document.fullscreenElement || document.webkitFullscreenElement);
+  fsBtn.querySelector('svg').innerHTML = isFull
+    ? '<path d="M5 9H3v12h12v-2H5V9zm4-6H3v6h2V5h4V3zm8 14h2V5h-6V3h-2v6h6v8zm2 4h-6v2h8v-8h-2v6z" fill="#ffd060"/>'
+    : '<path d="M3 3h6v2H5v4H3V3zm12 0h6v6h-2V5h-4V3zM3 15h2v4h4v2H3v-6zm16 4h-4v2h6v-6h-2v4z" fill="#ffd060"/>';
+}
+document.addEventListener('fullscreenchange',       onFsChange);
+document.addEventListener('webkitfullscreenchange', onFsChange);
+
+// Đặt vị trí fs-btn phía trên vr-btn (set bởi updateLabelPositions)
+
+// ── VR / QR Popup ─────────────────────────────────────────────────
+const VR_LINK = 'https://scnry.app/QlJoq6iKEWb';
+
+const vrBtn     = document.getElementById('vr-btn');
+const qrOverlay = document.getElementById('qr-overlay');
+vrBtn.addEventListener('click',      () => qrOverlay.classList.add('open'));
+vrBtn.addEventListener('touchstart', (e) => { e.stopPropagation(); qrOverlay.classList.add('open'); }, { passive: true });
+
+function closeQR() { qrOverlay.classList.remove('open'); }
+document.getElementById('qr-close-btn').addEventListener('click', closeQR);
+qrOverlay.addEventListener('click', (e) => { if (e.target === qrOverlay) closeQR(); });
+
+document.getElementById('qr-copy-btn').addEventListener('click', () => {
+  navigator.clipboard.writeText(VR_LINK).then(() => {
+    const msg = document.getElementById('qr-copied-msg');
+    msg.textContent = '✓ Đã copy!';
+    setTimeout(() => msg.textContent = '', 2000);
+  }).catch(() => {
+    document.getElementById('qr-copied-msg').textContent = VR_LINK;
+  });
+});
+document.getElementById('qr-open-btn').addEventListener('click', () => window.open(VR_LINK, '_blank'));
+
+</script>
+</body>
+</html>
