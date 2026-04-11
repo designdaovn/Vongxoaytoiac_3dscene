@@ -600,7 +600,7 @@ const doJump = () => { if (onGround) { velY=JUMP_VEL; onGround=false; } };
 document.getElementById('btn-jump').addEventListener('mousedown',  doJump);
 document.getElementById('btn-jump').addEventListener('touchstart', doJump, {passive:true});
 document.getElementById('btn-jump').addEventListener('touchend',   ()=>{}, {passive:true});
-const SPEEDS = [4.0];
+const SPEEDS = [6.0];
 let sMode = 0;
 
 // ── Raycaster ─────────────────────────────────────────────────────
