@@ -414,8 +414,22 @@ loader.load('Crime_Scene.glb',
     const box    = new THREE.Box3().setFromObject(model);
     const size   = new THREE.Vector3(); box.getSize(size);
     const center = new THREE.Vector3(); box.getCenter(center);
-    FLOOR_Y      = box.min.y;
     window._BOX  = box;
+
+    // Tìm mesh "Nen Dat" để lấy đúng chiều cao nền đất
+    let nenDatMesh = null;
+    model.traverse((node) => {
+      if (node.isMesh && node.name === 'Nen Dat') {
+        nenDatMesh = node;
+      }
+    });
+    if (nenDatMesh) {
+      const floorBox = new THREE.Box3().setFromObject(nenDatMesh);
+      FLOOR_Y = floorBox.max.y; // mặt trên của nền đất
+    } else {
+      FLOOR_Y = box.min.y; // fallback nếu không tìm thấy
+      console.warn('Không tìm thấy mesh "Nen Dat", dùng box.min.y làm FLOOR_Y');
+    }
 
     // Đặt camera ở giữa phòng, cao mắt người
     camera.position.set(center.x, FLOOR_Y + 1.65, center.z);
