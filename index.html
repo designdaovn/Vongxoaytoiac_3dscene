@@ -411,6 +411,11 @@ loader.load('Crime_Scene.glb',
 
     scene.add(model);
 
+    // Thu thập tất cả mesh để terrain raycasting
+    model.traverse((node) => {
+      if (node.isMesh) terrainMeshes.push(node);
+    });
+
     const box    = new THREE.Box3().setFromObject(model);
     const size   = new THREE.Vector3(); box.getSize(size);
     const center = new THREE.Vector3(); box.getCenter(center);
@@ -602,6 +607,13 @@ let sMode = 0;
 const raycaster    = new THREE.Raycaster();
 const screenCenter = new THREE.Vector2(0, 0);
 
+// ── Terrain Raycaster — bắn tia xuống để phát hiện địa hình ──────
+const terrainRay = new THREE.Raycaster();
+terrainRay.far   = 50; // tầm quét tối đa xuống dưới
+const _downDir   = new THREE.Vector3(0, -1, 0);
+// Danh sách mesh địa hình để raycast (populate sau khi model load)
+const terrainMeshes = [];
+
 // ── Dữ liệu tương tác ─────────────────────────────────────────────
 const INTERACTIONS = {
   'Plane.001':                { title: '🩸 Vết máu',            body: 'Có vết máu trên mặt đất. Nhóm máu AB+. Cần phân tích thêm.' },
@@ -697,14 +709,39 @@ function animate() {
     camera.position.z += (dz/len) * sp;
   }
 
-  // Gravity & jump
+  // ── Gravity, jump & terrain following ───────────────────────────
   if (!onGround) velY += GRAVITY * dt;
   camera.position.y += velY * dt;
-  const ground = FLOOR_Y + EYE_H;
-  if (camera.position.y <= ground) {
-    camera.position.y = ground;
+
+  // Bắn tia thẳng xuống từ vị trí camera để tìm mặt đất bên dưới
+  const rayOrigin = camera.position.clone();
+  // Bắt đầu từ hơi cao hơn để tránh trường hợp camera đang chính xác trên mesh
+  rayOrigin.y += 0.1;
+  terrainRay.set(rayOrigin, _downDir);
+  const groundHits = terrainRay.intersectObjects(terrainMeshes, false);
+
+  let groundY = FLOOR_Y; // fallback về nền đất gốc
+  if (groundHits.length > 0) {
+    // Lấy điểm chạm gần nhất (đã sort tự động)
+    groundY = groundHits[0].point.y;
+  }
+
+  const surfaceY = groundY + EYE_H;
+
+  if (camera.position.y <= surfaceY) {
+    camera.position.y = surfaceY;
     velY = 0;
     onGround = true;
+  } else {
+    // Kiểm tra xem có mặt đất ngay dưới chân không (snap khi đi xuống dốc)
+    // Nếu chênh lệch nhỏ hơn ngưỡng → coi như đang trên đất, không rơi
+    if (velY <= 0 && camera.position.y - surfaceY < 0.35) {
+      camera.position.y = surfaceY;
+      velY = 0;
+      onGround = true;
+    } else {
+      onGround = false;
+    }
   }
 
   // Boundary
