@@ -14,14 +14,14 @@ canvas { display:block; }
 
 /* ── Loading ── */
 #loading {
-  position:fixed; inset:0; background:#0d0d12;
+  position:fixed; inset:0; background:#1a1a1a;
   display:flex; flex-direction:column; align-items:center; justify-content:center;
   z-index:200; transition:opacity 1s; padding:20px;
 }
-#loading h1 { color:#cc3333; font-size:clamp(1.2rem,5vw,2rem); letter-spacing:0.2em; text-transform:uppercase; margin-bottom:6px; text-shadow:0 0 30px rgba(200,50,50,0.5); text-align:center; }
+#loading h1 { color:#F5C800; font-size:clamp(1.2rem,5vw,2rem); letter-spacing:0.2em; text-transform:uppercase; margin-bottom:6px; text-shadow:0 0 30px rgba(245,200,0,0.5); text-align:center; }
 #loading p  { color:#555; font-size:clamp(0.7rem,2.5vw,0.8rem); letter-spacing:0.1em; margin-bottom:30px; text-align:center; }
-#bar { width:min(260px,80vw); height:3px; background:#1a1a2a; border-radius:2px; overflow:hidden; }
-#bar-fill { height:100%; width:0%; background:linear-gradient(90deg,#cc3333,#ff6666); transition:width 0.2s; }
+#bar { width:min(260px,80vw); height:3px; background:#2a2a1a; border-radius:2px; overflow:hidden; }
+#bar-fill { height:100%; width:0%; background:linear-gradient(90deg,#F5C800,#FFE566); transition:width 0.2s; }
 #bar-txt { color:#555; margin-top:10px; font-size:0.72rem; text-align:center; }
 
 /* ── Crosshair ── */
@@ -29,25 +29,25 @@ canvas { display:block; }
   position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
   width:16px; height:16px; pointer-events:none; z-index:50;
 }
-#xhair::before,#xhair::after { content:''; position:absolute; background:rgba(255,80,80,0.95); border-radius:1px; }
+#xhair::before,#xhair::after { content:''; position:absolute; background:rgba(245,200,0,0.95); border-radius:1px; }
 #xhair::before { width:2px; height:100%; left:50%; transform:translateX(-50%); }
 #xhair::after  { width:100%; height:2px; top:50%; transform:translateY(-50%); }
 
 /* ── Badge (top-left) ── */
 #badge {
   position:fixed; top:12px; left:12px; z-index:50; pointer-events:none;
-  background:rgba(0,0,0,0.75); border:1px solid rgba(180,30,30,0.4);
+  background:rgba(0,0,0,0.75); border:1px solid rgba(245,200,0,0.4);
   border-radius:10px; padding:6px 10px; backdrop-filter:blur(10px);
 }
-#badge b { color:#cc3333; font-size:clamp(9px,2.5vw,12px); letter-spacing:0.1em; text-transform:uppercase; display:block; }
+#badge b { color:#F5C800; font-size:clamp(9px,2.5vw,12px); letter-spacing:0.1em; text-transform:uppercase; display:block; }
 #badge small { color:#555; font-size:clamp(8px,2vw,10px); }
 
 /* ── Hint (top-center) — ẩn trên mobile nhỏ ── */
 #hint {
   position:fixed; top:12px; left:50%; transform:translateX(-50%); z-index:50;
-  background:rgba(0,0,0,0.75); color:rgba(255,200,200,0.9);
+  background:rgba(0,0,0,0.75); color:rgba(255,230,120,0.9);
   padding:6px 14px; border-radius:20px; font-size:clamp(9px,2.2vw,11px);
-  border:1px solid rgba(180,50,50,0.3); backdrop-filter:blur(8px);
+  border:1px solid rgba(180,130,0,0.3); backdrop-filter:blur(8px);
   pointer-events:none; transition:opacity 1.5s;
   white-space:nowrap; max-width:calc(100vw - 160px); overflow:hidden; text-overflow:ellipsis;
 }
@@ -73,7 +73,7 @@ canvas { display:block; }
   width:var(--bs,44px); height:var(--bs,44px);
   /* Reset hoàn toàn iOS default styles */
   -webkit-appearance:none; appearance:none;
-  background:rgba(0,0,0,0.55); border:1px solid rgba(200,60,60,0.4);
+  background:rgba(0,0,0,0.55); border:1px solid rgba(245,200,0,0.4);
   border-radius:10px;
   /* Không dùng color/font-size cho text — dùng SVG thay thế */
   color:transparent; font-size:0;
@@ -85,7 +85,7 @@ canvas { display:block; }
   touch-action:none; flex-shrink:0; box-sizing:border-box;
 }
 .btn:active,.btn.on,#btn-jump:active,#btn-jump.on {
-  background:rgba(200,50,50,0.5); transform:scale(0.93);
+  background:rgba(200,160,0,0.5); transform:scale(0.93);
 }
 .btn.empty { visibility:hidden; pointer-events:none; }
 /* SVG icon bên trong nút */
@@ -99,11 +99,11 @@ canvas { display:block; }
 /* btn-center */
 .btn-center {
   background:rgba(255,255,255,0.05);
-  border-color:rgba(200,60,60,0.2);
+  border-color:rgba(245,200,0,0.2);
   pointer-events:auto; cursor:pointer;
 }
 .btn-center:active,.btn-center.on {
-  background:rgba(200,50,50,0.45) !important; transform:scale(0.93);
+  background:rgba(200,160,0,0.45) !important; transform:scale(0.93);
 }
 /* Nút fullscreen */
 /* ══ Right buttons — fs / vr / rotate ══ */
@@ -125,12 +125,12 @@ canvas { display:block; }
   -webkit-appearance:none; appearance:none;
   box-sizing:border-box; flex-shrink:0;
 }
-#fs-btn     { background:rgba(0,0,0,0.7); border:1px solid rgba(255,200,80,0.5); }
+#fs-btn     { background:rgba(0,0,0,0.7); border:1px solid rgba(245,200,0,0.5); }
 #vr-btn     { background:rgba(0,0,0,0.7); border:1px solid rgba(100,160,255,0.5); }
-#rotate-btn { background:rgba(0,0,0,0.7); border:1px solid rgba(200,60,60,0.5); color:#cc6666; }
+#rotate-btn { background:rgba(0,0,0,0.7); border:1px solid rgba(245,200,0,0.5); color:#F5C800; }
 #fs-btn:active     { background:rgba(180,130,0,0.45);  transform:scale(0.92); }
 #vr-btn:active     { background:rgba(60,100,200,0.45); transform:scale(0.92); }
-#rotate-btn:active { background:rgba(160,30,30,0.45);  transform:scale(0.92); }
+#rotate-btn:active { background:rgba(160,120,0,0.45);  transform:scale(0.92); }
 #fs-btn svg, #vr-btn svg, #rotate-btn svg { width:52%; height:52%; display:block; flex-shrink:0; }
 #ctrl { display:none !important; }
 
@@ -150,7 +150,7 @@ canvas { display:block; }
 /* ── Interact prompt ── */
 #interact-prompt {
   position:fixed; left:50%; transform:translateX(-50%);
-  background:rgba(200,50,50,0.85); color:#fff; padding:7px 20px;
+  background:rgba(200,160,0,0.85); color:#111; padding:7px 20px;
   border-radius:20px; font-size:clamp(10px,2.5vw,12px); font-weight:bold; letter-spacing:0.08em;
   pointer-events:none; z-index:50; display:none; white-space:nowrap;
 }
@@ -161,12 +161,12 @@ canvas { display:block; }
   background:rgba(10,10,20,0.95); color:#eee;
   padding:clamp(16px,4vw,24px) clamp(16px,5vw,28px);
   border-radius:14px; font-size:clamp(12px,3vw,13px); line-height:1.7;
-  border:1px solid rgba(200,50,50,0.4); backdrop-filter:blur(12px);
+  border:1px solid rgba(245,200,0,0.4); backdrop-filter:blur(12px);
   pointer-events:auto; z-index:60; display:none;
   width:min(340px, 88vw);
   text-align:center; box-shadow:0 0 40px rgba(0,0,0,0.6);
 }
-#popup-title { color:#ff8888; font-size:clamp(13px,3.5vw,15px); font-weight:bold; margin-bottom:8px; }
+#popup-title { color:#F5C800; font-size:clamp(13px,3.5vw,15px); font-weight:bold; margin-bottom:8px; }
 #popup-close-hint { margin-top:12px; color:#555; font-size:clamp(10px,2.5vw,11px); }
 
 /* #vr-btn style — managed by #right-btns container */
@@ -222,7 +222,7 @@ canvas { display:block; }
 }
 
 /* ── Corner decorations ── */
-.corner { position:fixed; width:16px; height:16px; border-color:rgba(200,30,30,0.45); border-style:solid; pointer-events:none; z-index:45; }
+.corner { position:fixed; width:16px; height:16px; border-color:rgba(245,200,0,0.45); border-style:solid; pointer-events:none; z-index:45; }
 .corner.tl{top:8px;left:8px;border-width:2px 0 0 2px}
 .corner.tr{top:8px;right:8px;border-width:2px 2px 0 0}
 .corner.bl{bottom:8px;left:8px;border-width:0 0 2px 2px}
@@ -268,7 +268,7 @@ canvas { display:block; }
 <div id="badge"><b>☠ Crime Scene</b><small>First Person · 3D</small></div>
 <div id="hint">Giữ chuột trái + kéo để nhìn · WASD di chuyển · Space nhảy</div>
 <div id="inspect-label">
-  <span id="inspect-name" style="color:#ffdd88"></span>
+  <span id="inspect-name" style="color:#F5C800"></span>
 </div>
 <div id="interact-prompt">
   Nhấn <kbd style='background:rgba(255,255,255,0.2);padding:1px 6px;border-radius:4px'>E</kbd> để tương tác
@@ -281,13 +281,13 @@ canvas { display:block; }
 <div id="dpad-wrap">
   <div id="dpad">
     <div class="btn empty"></div>
-    <div class="btn" id="btn-w"><svg viewBox="0 0 24 24"><path d="M12 6l-8 10h16z" fill="rgba(255,150,150,0.9)"/></svg></div>
+    <div class="btn" id="btn-w"><svg viewBox="0 0 24 24"><path d="M12 6l-8 10h16z" fill="rgba(245,200,0,0.9)"/></svg></div>
     <div class="btn empty"></div>
-    <div class="btn" id="btn-a"><svg viewBox="0 0 24 24"><path d="M6 12l10-8v16z" fill="rgba(255,150,150,0.9)"/></svg></div>
-    <div class="btn btn-center" id="btn-center"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="rgba(255,150,150,0.4)"/><circle cx="12" cy="12" r="8" fill="none" stroke="rgba(255,150,150,0.3)" stroke-width="1.5"/></svg></div>
-    <div class="btn" id="btn-d"><svg viewBox="0 0 24 24"><path d="M18 12L8 4v16z" fill="rgba(255,150,150,0.9)"/></svg></div>
+    <div class="btn" id="btn-a"><svg viewBox="0 0 24 24"><path d="M6 12l10-8v16z" fill="rgba(245,200,0,0.9)"/></svg></div>
+    <div class="btn btn-center" id="btn-center"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="rgba(245,200,0,0.4)"/><circle cx="12" cy="12" r="8" fill="none" stroke="rgba(245,200,0,0.3)" stroke-width="1.5"/></svg></div>
+    <div class="btn" id="btn-d"><svg viewBox="0 0 24 24"><path d="M18 12L8 4v16z" fill="rgba(245,200,0,0.9)"/></svg></div>
     <div class="btn empty"></div>
-    <div class="btn" id="btn-s"><svg viewBox="0 0 24 24"><path d="M12 18l8-10H4z" fill="rgba(255,150,150,0.9)"/></svg></div>
+    <div class="btn" id="btn-s"><svg viewBox="0 0 24 24"><path d="M12 18l8-10H4z" fill="rgba(245,200,0,0.9)"/></svg></div>
     <div class="btn empty"></div>
   </div>
   <div id="btn-jump"><svg viewBox="0 0 24 24"><path d="M12 5l-8 10h16z" fill="rgba(140,180,255,0.9)"/><rect x="10" y="15" width="4" height="5" rx="1" fill="rgba(140,180,255,0.9)"/></svg></div>
